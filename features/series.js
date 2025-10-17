@@ -37,25 +37,46 @@ module.exports = (client) => {
 
     const lines = embed.description.split('\n');
     
-    const seriesLines = lines.filter(line => {
-      const trimmed = line.trim();
-      return /^(\*\*)?`?\d+`?[\]\s]*[•\]]/.test(trimmed) || /^\*\*\d+\]/.test(trimmed) || /^\d+\s*[•\]]/.test(trimmed);
-    });
+    let seriesLines;
+    
+    if (hasTimerDesc) {
+      // For timer format: **1] The Empty Box and Zeroth Maria**
+      seriesLines = lines.filter(line => {
+        const trimmed = line.trim();
+        return /^\*\*\d+\]/.test(trimmed);
+      });
+    } else {
+      // For choose format: existing logic
+      seriesLines = lines.filter(line => {
+        const trimmed = line.trim();
+        return /^(\*\*)?`?\d+`?[\]\s]*[•\]]/.test(trimmed) || /^\*\*\d+\]/.test(trimmed) || /^\d+\s*[•\]]/.test(trimmed);
+      });
+    }
 
     if (seriesLines.length === 0) return;
 
     let replyText = '';
     for (let i = 0; i < seriesLines.length; i++) {
       const line = seriesLines[i];
-      // Remove all possible prefixes and markdown
-      let seriesName = line.trim()
-        .replace(/^\*\*/, '')  // Remove leading **
-        .replace(/\*\*$/, '')  // Remove trailing **
-        .replace(/^`\d+`\s*•\s*/, '')  // Remove `1` • 
-        .replace(/^`\d+`\s*\]\s*/, '')  // Remove `1`] 
-        .replace(/^\d+\s*•\s*/, '')  // Remove 1 • 
-        .replace(/^\d+\]\s*/, '')  // Remove 1] 
-        .trim();
+      let seriesName;
+      
+      if (hasTimerDesc) {
+        // For timer format: **1] The Empty Box and Zeroth Maria**
+        seriesName = line.trim()
+          .replace(/^\*\*\d+\]\s*/, '')  // Remove **1] 
+          .replace(/\*\*$/, '')  // Remove trailing **
+          .trim();
+      } else {
+        // For choose format: existing logic
+        seriesName = line.trim()
+          .replace(/^\*\*/, '')  // Remove leading **
+          .replace(/\*\*$/, '')  // Remove trailing **
+          .replace(/^`\d+`\s*•\s*/, '')  // Remove `1` • 
+          .replace(/^`\d+`\s*\]\s*/, '')  // Remove `1`] 
+          .replace(/^\d+\s*•\s*/, '')  // Remove 1 • 
+          .replace(/^\d+\]\s*/, '')  // Remove 1] 
+          .trim();
+      }
       
       const match = await findSeriesMatch(seriesName);
       const hearts = match ? match.hearts : '00';
