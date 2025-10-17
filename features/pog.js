@@ -45,7 +45,7 @@ module.exports = (client) => {
 
     // Check if any value > 0 (testing) - only trigger once per message
     const maxValue = Math.max(...heartValues);
-    if (maxValue > 99) {
+    if (maxValue > 0) {
       console.log('🔥 POG TRIGGERED! Max value:', maxValue, 'from values:', heartValues);
       await handlePog(message, guildData.targetChannelId);
     }
@@ -53,6 +53,21 @@ module.exports = (client) => {
 
   async function handlePog(message, targetChannelId) {
     const mentionedUser = message.mentions.users.first();
+    
+    // Extract heart values for display
+    const heartValues = [];
+    for (const row of message.components) {
+      for (const component of row.components) {
+        const label = component.label || '';
+        const numbers = label.match(/\d+/g);
+        if (numbers) {
+          heartValues.push(parseInt(numbers[0]));
+        }
+      }
+    }
+    
+    // Format hearts display
+    const heartsDisplay = heartValues.map(value => `❤️ \`${value}\``).join(' ｜');
     
     if (message.channel.isTextBased()) {
       await message.channel.send(`${mentionedUser ? `<@${mentionedUser.id}>` : ''}🎉 Check it out in <#${targetChannelId}>`);
@@ -62,7 +77,7 @@ module.exports = (client) => {
 
     const embed = new EmbedBuilder()
       .setTitle('<a:AnimeGirljumping:1365978464435441675> 𝑷𝑶𝑮𝑮𝑬𝑹𝑺 <a:brown_jump:1365979505977458708>')
-      .setDescription(`${mentionedUser ? `<@${mentionedUser.id}>` : 'Someone'} triggered a POG!`)
+      .setDescription(`${mentionedUser ? `<@${mentionedUser.id}>` : 'Someone'} triggered a POG!\n\n**${heartsDisplay}**`)
       .setColor(0x87CEEB)
       .setImage(imageUrl)
       .setFooter({ text: `Dropped by: ${mentionedUser?.tag || 'Unknown#0000'}` });
