@@ -45,7 +45,7 @@ module.exports = (client) => {
 
     // Check if any value > 0 (testing) - only trigger once per message
     const maxValue = Math.max(...heartValues);
-    if (maxValue > 0) {
+    if (maxValue > 99) {
       console.log('🔥 POG TRIGGERED! Max value:', maxValue, 'from values:', heartValues);
       await handlePog(message, guildData.targetChannelId);
     }
@@ -95,3 +95,4 @@ module.exports = (client) => {
     }
   }
 };
+
