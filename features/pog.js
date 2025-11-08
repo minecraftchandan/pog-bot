@@ -12,7 +12,20 @@ mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log('✅ MongoDB connected'))
   .catch(err => console.error('❌ Mongo connection error:', err));
 
-// Utility to format large numbers as '1k', '1.1k', etc. up to '100k'
+// Utility to parse numbers like 1k, 1.2k, 9.9k, 1m, etc.
+function parseShortNumber(str) {
+  if (!str) return 0;
+  str = str.toLowerCase().replace(/,/g, '');
+  const match = str.match(/^(\d+(?:\.\d+)?)([km])?$/);
+  if (!match) return parseInt(str) || 0;
+  let num = parseFloat(match[1]);
+  let suffix = match[2];
+  if (suffix === 'k') return Math.round(num * 1000);
+  if (suffix === 'm') return Math.round(num * 1000000);
+  return Math.round(num);
+}
+
+// Utility to format large numbers as '1k', '1.1k', etc.
 function formatNumber(num) {
   if (num < 1000) return num.toString();
   if (num < 100000) {
@@ -34,14 +47,15 @@ module.exports = (client) => {
     const mentionedUser = message.mentions.users.first();
     const username = mentionedUser ? mentionedUser.username : 'Unknown';
 
-    // Extract heart values same as button.js
+    // Extract heart values including compact notation (e.g. 1.1k)
     const heartValues = [];
     for (const row of message.components) {
       for (const component of row.components) {
         const label = component.label || '';
-        const numbers = label.match(/\d+/g);
-        if (numbers) {
-          heartValues.push(parseInt(numbers[0]));
+        // Extract formatted numbers like 9.9k, 10k, 1.2m, etc.
+        const numberMatch = label.match(/(\d+(?:\.\d+)?[kKmM]?)/);
+        if (numberMatch) {
+          heartValues.push(parseShortNumber(numberMatch[1]));
         }
       }
     }
@@ -55,7 +69,7 @@ module.exports = (client) => {
     const guildData = await Guild.findOne({ guild_id: guildId });
     if (!guildData?.targetChannelId) return;
 
-    // Check if any value > 99 (testing) - only trigger once per message
+    // Check if any value > 99 - only trigger once per message
     const maxValue = Math.max(...heartValues);
     if (maxValue > 99) {
       console.log('🔥 POG TRIGGERED! Max value:', maxValue, 'from values:', heartValues);
@@ -71,9 +85,10 @@ module.exports = (client) => {
     for (const row of message.components) {
       for (const component of row.components) {
         const label = component.label || '';
-        const numbers = label.match(/\d+/g);
-        if (numbers) {
-          heartValues.push(parseInt(numbers[0]));
+        // Extract formatted numbers like 9.9k, 10k, 1.2m, etc.
+        const numberMatch = label.match(/(\d+(?:\.\d+)?[kKmM]?)/);
+        if (numberMatch) {
+          heartValues.push(parseShortNumber(numberMatch[1]));
         }
       }
     }
