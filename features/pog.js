@@ -3,8 +3,7 @@ const {
   ButtonBuilder,
   ButtonStyle,
   ActionRowBuilder,
-  }
-   = require('discord.js');
+} = require('discord.js');
 const mongoose = require('mongoose');
 const Guild = require('../models/Guild');
 
@@ -12,6 +11,19 @@ const Guild = require('../models/Guild');
 mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log('✅ MongoDB connected'))
   .catch(err => console.error('❌ Mongo connection error:', err));
+
+// Utility to format large numbers as '1k', '1.1k', etc. up to '100k'
+function formatNumber(num) {
+  if (num < 1000) return num.toString();
+  if (num < 100000) {
+    // Show one decimal for e.g. 1.1k, remove .0 for whole k's
+    return (num / 1000).toFixed(num % 1000 === 0 ? 0 : 1) + 'k';
+  }
+  // For 100k exactly, show '100k'
+  if (num === 100000) return '100k';
+  // If ever above (shouldn't happen), fallback to number as string
+  return num.toString();
+}
 
 module.exports = (client) => {
   const targetBotId = '853629533855809596';
@@ -21,7 +33,7 @@ module.exports = (client) => {
 
     const mentionedUser = message.mentions.users.first();
     const username = mentionedUser ? mentionedUser.username : 'Unknown';
-    
+
     // Extract heart values same as button.js
     const heartValues = [];
     for (const row of message.components) {
@@ -36,14 +48,14 @@ module.exports = (client) => {
 
     // Only proceed with POG logic if message has attachments
     if (!message.attachments.size) return;
-    
+
     const guildId = message.guildId;
     if (!guildId) return;
 
     const guildData = await Guild.findOne({ guild_id: guildId });
     if (!guildData?.targetChannelId) return;
 
-    // Check if any value > 0 (testing) - only trigger once per message
+    // Check if any value > 99 (testing) - only trigger once per message
     const maxValue = Math.max(...heartValues);
     if (maxValue > 99) {
       console.log('🔥 POG TRIGGERED! Max value:', maxValue, 'from values:', heartValues);
@@ -53,7 +65,7 @@ module.exports = (client) => {
 
   async function handlePog(message, targetChannelId) {
     const mentionedUser = message.mentions.users.first();
-    
+
     // Extract heart values for display
     const heartValues = [];
     for (const row of message.components) {
@@ -65,10 +77,10 @@ module.exports = (client) => {
         }
       }
     }
-    
-    // Format hearts display
-    const heartsDisplay = heartValues.map(value => `❤️ \`${value}\``).join(' ｜');
-    
+
+    // Format hearts display using the short format
+    const heartsDisplay = heartValues.map(value => `❤️ \`${formatNumber(value)}\``).join(' ｜');
+
     if (message.channel.isTextBased()) {
       await message.channel.send(`${mentionedUser ? `<@${mentionedUser.id}>` : ''}🎉 Check it out in <#${targetChannelId}>`);
     }
@@ -95,4 +107,3 @@ module.exports = (client) => {
     }
   }
 };
-
