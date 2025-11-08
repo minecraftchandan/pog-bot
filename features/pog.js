@@ -12,29 +12,32 @@ mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log('✅ MongoDB connected'))
   .catch(err => console.error('❌ Mongo connection error:', err));
 
-// Utility to parse numbers like 1k, 1.2k, 9.9k, 1m, etc.
-function parseShortNumber(str) {
+// Utility to parse BOTH plain numbers and compact notation (e.g. '1.1k', '1234')
+function parseFlexibleNumber(str) {
   if (!str) return 0;
   str = str.toLowerCase().replace(/,/g, '');
-  const match = str.match(/^(\d+(?:\.\d+)?)([km])?$/);
-  if (!match) return parseInt(str) || 0;
-  let num = parseFloat(match[1]);
-  let suffix = match[2];
-  if (suffix === 'k') return Math.round(num * 1000);
-  if (suffix === 'm') return Math.round(num * 1000000);
-  return Math.round(num);
+  // Try short notation: 1.2k, 4.5m, etc.
+  let match = str.match(/^(\d+(?:\.\d+)?)([km])?$/);
+  if (match) {
+    let num = parseFloat(match[1]);
+    let suffix = match[2];
+    if (suffix === 'k') return Math.round(num * 1000);
+    if (suffix === 'm') return Math.round(num * 1000000);
+    return Math.round(num);
+  }
+  // Try to just parse the first number found (plain or long form)
+  match = str.match(/(\d+)/);
+  if (match) return parseInt(match[1]);
+  return 0;
 }
 
 // Utility to format large numbers as '1k', '1.1k', etc.
 function formatNumber(num) {
   if (num < 1000) return num.toString();
   if (num < 100000) {
-    // Show one decimal for e.g. 1.1k, remove .0 for whole k's
     return (num / 1000).toFixed(num % 1000 === 0 ? 0 : 1) + 'k';
   }
-  // For 100k exactly, show '100k'
   if (num === 100000) return '100k';
-  // If ever above (shouldn't happen), fallback to number as string
   return num.toString();
 }
 
@@ -45,22 +48,20 @@ module.exports = (client) => {
     if (!message.components?.length) return;
 
     const mentionedUser = message.mentions.users.first();
-    const username = mentionedUser ? mentionedUser.username : 'Unknown';
 
-    // Extract heart values including compact notation (e.g. 1.1k)
+    // Extract heart values from both short and plain numbers
     const heartValues = [];
     for (const row of message.components) {
       for (const component of row.components) {
         const label = component.label || '';
-        // Extract formatted numbers like 9.9k, 10k, 1.2m, etc.
+        // Match a number with or without k/m
         const numberMatch = label.match(/(\d+(?:\.\d+)?[kKmM]?)/);
         if (numberMatch) {
-          heartValues.push(parseShortNumber(numberMatch[1]));
+          heartValues.push(parseFlexibleNumber(numberMatch[1]));
         }
       }
     }
 
-    // Only proceed with POG logic if message has attachments
     if (!message.attachments.size) return;
 
     const guildId = message.guildId;
@@ -69,7 +70,6 @@ module.exports = (client) => {
     const guildData = await Guild.findOne({ guild_id: guildId });
     if (!guildData?.targetChannelId) return;
 
-    // Check if any value > 99 - only trigger once per message
     const maxValue = Math.max(...heartValues);
     if (maxValue > 99) {
       console.log('🔥 POG TRIGGERED! Max value:', maxValue, 'from values:', heartValues);
@@ -85,15 +85,13 @@ module.exports = (client) => {
     for (const row of message.components) {
       for (const component of row.components) {
         const label = component.label || '';
-        // Extract formatted numbers like 9.9k, 10k, 1.2m, etc.
         const numberMatch = label.match(/(\d+(?:\.\d+)?[kKmM]?)/);
         if (numberMatch) {
-          heartValues.push(parseShortNumber(numberMatch[1]));
+          heartValues.push(parseFlexibleNumber(numberMatch[1]));
         }
       }
     }
 
-    // Format hearts display using the short format
     const heartsDisplay = heartValues.map(value => `❤️ \`${formatNumber(value)}\``).join(' ｜');
 
     if (message.channel.isTextBased()) {
