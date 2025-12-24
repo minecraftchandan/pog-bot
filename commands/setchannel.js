@@ -7,12 +7,12 @@ module.exports = (client) => {
     await client.application.commands.create(
       new SlashCommandBuilder()
         .setName('setchannel')
-        .setDescription('Set the target channel by ID')
+        .setDescription('Set the target channel by ID (leave empty to remove)')
         .addStringOption(option =>
           option
             .setName('channelid')
             .setDescription('The channel ID to send alerts to')
-            .setRequired(true)
+            .setRequired(false)
         )
         .toJSON()
     );
@@ -26,6 +26,15 @@ module.exports = (client) => {
     const channelId = interaction.options.getString('channelid');
     const guildId = interaction.guildId;
     if (!guildId) return await interaction.reply('❌ Use this command inside a server.');
+
+    if (!channelId) {
+      await Guild.findOneAndUpdate(
+        { guild_id: guildId },
+        { targetChannelId: null },
+        { upsert: true }
+      );
+      return await interaction.reply('✅ Target channel removed.');
+    }
 
     const channel = await client.channels.fetch(channelId).catch(() => null);
     if (!channel)
