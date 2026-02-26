@@ -44,79 +44,120 @@ function formatNumber(num) {
 module.exports = (client) => {
   const targetBotId = '853629533855809596';
   client.on('messageCreate', async (message) => {
-    if (message.author.id !== targetBotId) return;
-    if (!message.components?.length) return;
+    try {
+      if (message.author.id !== targetBotId) return;
+      if (!message.components?.length) return;
 
-    const mentionedUser = message.mentions.users.first();
+      const mentionedUser = message.mentions.users.first();
 
-    // Extract heart values from both short and plain numbers
-    const heartValues = [];
-    for (const row of message.components) {
-      for (const component of row.components) {
-        const label = component.label || '';
-        // Match a number with or without k/m
-        const numberMatch = label.match(/(\d+(?:\.\d+)?[kKmM]?)/);
-        if (numberMatch) {
-          heartValues.push(parseFlexibleNumber(numberMatch[1]));
+      // Extract heart values from both short and plain numbers
+      const heartValues = [];
+      for (const row of message.components) {
+        for (const component of row.components) {
+          const label = component.label || '';
+          // Match a number with or without k/m
+          const numberMatch = label.match(/(\d+(?:\.\d+)?[kKmM]?)/);
+          if (numberMatch) {
+            heartValues.push(parseFlexibleNumber(numberMatch[1]));
+          }
         }
       }
-    }
 
-    if (!message.attachments.size) return;
+      if (!message.attachments.size) return;
 
-    const guildId = message.guildId;
-    if (!guildId) return;
+      const guildId = message.guildId;
+      if (!guildId) return;
 
-    const guildData = await Guild.findOne({ guild_id: guildId });
-    if (!guildData?.targetChannelId) return;
+      const guildData = await Guild.findOne({ guild_id: guildId });
+      if (!guildData?.targetChannelId) return;
 
-    const maxValue = Math.max(...heartValues);
-    if (maxValue > 99) {
-      console.log('🔥 POG TRIGGERED! Max value:', maxValue, 'from values:', heartValues);
-      await handlePog(message, guildData.targetChannelId);
+      const maxValue = Math.max(...heartValues);
+      if (maxValue > 99) {
+        console.log('🔥 POG TRIGGERED! Max value:', maxValue, 'from values:', heartValues);
+        await handlePog(message, guildData.targetChannelId);
+      }
+    } catch (err) {
+      console.error('Unhandled error in messageCreate handler:', err);
+      // optionally notify the guild channel if possible
+      if (message.channel?.isTextBased && message.channel.isTextBased()) {
+        message.channel.send('⚠️ Something went wrong processing a pog message.').catch(() => {});
+      }
     }
   });
 
   async function handlePog(message, targetChannelId) {
-    const mentionedUser = message.mentions.users.first();
+    try {
+      const mentionedUser = message.mentions.users.first();
 
-    // Extract heart values for display
-    const heartValues = [];
-    for (const row of message.components) {
-      for (const component of row.components) {
-        const label = component.label || '';
-        const numberMatch = label.match(/(\d+(?:\.\d+)?[kKmM]?)/);
-        if (numberMatch) {
-          heartValues.push(parseFlexibleNumber(numberMatch[1]));
+      // Extract heart values for display
+      const heartValues = [];
+      for (const row of message.components) {
+        for (const component of row.components) {
+          const label = component.label || '';
+          const numberMatch = label.match(/(\d+(?:\.\d+)?[kKmM]?)/);
+          if (numberMatch) {
+            heartValues.push(parseFlexibleNumber(numberMatch[1]));
+          }
         }
       }
-    }
 
-    const heartsDisplay = heartValues.map(value => `❤️ \`${formatNumber(value)}\``).join(' ｜');
+      const heartsDisplay = heartValues.map(value => `❤️ \`${formatNumber(value)}\``).join(' ｜');
 
-    if (message.channel.isTextBased()) {
-      await message.channel.send(`${mentionedUser ? `<@${mentionedUser.id}>` : ''}🎉 Check it out in <#${targetChannelId}>`);
-    }
+      // let the original channel know we forwarded
+      if (message.channel.isTextBased()) {
+        await message.channel.send(`${mentionedUser ? `<@${mentionedUser.id}>` : ''}🎉 Check it out in <#${targetChannelId}>`).catch(() => {});
+      }
 
-    const imageUrl = message.attachments.first()?.url;
+      const imageUrl = message.attachments.first()?.url;
 
-    const embed = new EmbedBuilder()
-      .setTitle('<a:AnimeGirljumping:1365978464435441675> 𝑷𝑶𝑮𝑮𝑬𝑹𝑺 <a:brown_jump:1365979505977458708>')
-      .setDescription(`${mentionedUser ? `<@${mentionedUser.id}>` : 'Someone'} triggered a POG!\n\n**${heartsDisplay}**`)
-      .setColor(0x87CEEB)
-      .setImage(imageUrl)
-      .setFooter({ text: `Dropped by: ${mentionedUser?.tag || 'Unknown#0000'}` });
+      const embed = new EmbedBuilder()
+        .setTitle('<a:AnimeGirljumping:1365978464435441675> 𝑷𝑶𝑮𝑮𝑬𝑹𝑺 <a:brown_jump:1365979505977458708>')
+        .setDescription(`${mentionedUser ? `<@${mentionedUser.id}>` : 'Someone'} triggered a POG!\n\n**${heartsDisplay}**`)
+        .setColor(0x87CEEB)
+        .setImage(imageUrl)
+        .setFooter({ text: `Dropped by: ${mentionedUser?.tag || 'Unknown#0000'}` });
 
-    const button = new ButtonBuilder()
-      .setLabel('Jump to Message')
-      .setStyle(ButtonStyle.Link)
-      .setURL(message.url);
+      const button = new ButtonBuilder()
+        .setLabel('Jump to Message')
+        .setStyle(ButtonStyle.Link)
+        .setURL(message.url);
 
-    const row = new ActionRowBuilder().addComponents(button);
+      const row = new ActionRowBuilder().addComponents(button);
 
-    const targetChannel = await client.channels.fetch(targetChannelId);
-    if (targetChannel?.isTextBased()) {
-      await targetChannel.send({ embeds: [embed], components: [row] });
+      const targetChannel = await client.channels.fetch(targetChannelId);
+      if (!targetChannel) {
+        throw new Error(`Target channel ${targetChannelId} not found`);
+      }
+
+      // permission check
+      const perms = targetChannel.permissionsFor(client.user);
+      if (targetChannel.isTextBased() && perms && !perms.has('SendMessages')) {
+        const warning = `⚠️ I lack permission to send messages in <#${targetChannelId}>.`;
+        console.warn(warning);
+        // notify original channel and guild owner if possible
+        if (message.channel.isTextBased()) {
+          message.channel.send(warning).catch(() => {});
+        }
+        if (message.guild) {
+          const owner = await message.guild.fetchOwner().catch(() => null);
+          owner?.user?.send(warning).catch(() => {});
+        }
+        return;
+      }
+
+      if (targetChannel.isTextBased()) {
+        await targetChannel.send({ embeds: [embed], components: [row] });
+      }
+    } catch (err) {
+      console.error('Error in handlePog:', err);
+      if (err?.code === 50013) {
+        // permission error already handled above but just in case
+        const warning = `🔒 Missing permissions when trying to post POG embed in <#${targetChannelId}>.`;
+        if (message.channel?.isTextBased()) {
+          message.channel.send(warning).catch(() => {});
+        }
+      }
+      // swallow error so the client doesn't crash
     }
   }
 };

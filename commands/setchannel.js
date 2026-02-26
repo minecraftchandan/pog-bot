@@ -2,6 +2,8 @@ const { SlashCommandBuilder } = require('discord.js');
 const Guild = require('../models/Guild');
 
 module.exports = (client) => {
+  const BOT_OWNER_ID = '587709425708695552'; // replace with your Discord ID or load from env
+
   client.once('ready', async () => {
     if (!client.application?.commands) return;
     await client.application.commands.create(
@@ -23,10 +25,20 @@ module.exports = (client) => {
     if (!interaction.isChatInputCommand()) return;
     if (interaction.commandName !== 'setchannel') return;
 
-    const channelId = interaction.options.getString('channelid');
     const guildId = interaction.guildId;
-    if (!guildId) return await interaction.reply('❌ Use this command inside a server.');
+    if (!guildId) {
+      return await interaction.reply('❌ Use this command inside a server.');
+    }
 
+    // permission check: only bot owner or administrators
+    const isOwner = interaction.user.id === BOT_OWNER_ID;
+    const member = interaction.member;
+    const isAdmin = member?.permissions?.has('Administrator');
+    if (!isOwner && !isAdmin) {
+      return await interaction.reply({ content: '🚫 You don’t have permission to use this command. Only server administrators or the bot owner may run it.', ephemeral: true });
+    }
+
+    const channelId = interaction.options.getString('channelid');
     if (!channelId) {
       await Guild.findOneAndUpdate(
         { guild_id: guildId },
