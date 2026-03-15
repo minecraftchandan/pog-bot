@@ -111,7 +111,11 @@ module.exports = (client) => {
     }
 
     if (replyText) {
-      await message.reply(replyText.trim());
+      try {
+        await message.reply(replyText.trim());
+      } catch (err) {
+        console.error(`[series.js] Failed to reply in channel ${message.channel.id}:`, err.message);
+      }
     }
   });
 };
